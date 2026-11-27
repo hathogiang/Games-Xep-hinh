@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b0d17">
+  <title>NEON STACK — Xếp hình</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+    :root {
+      color-scheme: dark;
+      --bg: #0b0d17;
+      --panel: rgba(18, 21, 36, .86);
+      --line: rgba(151, 164, 220, .12);
+      --muted: #777e9e;
+      --text: #f2f3ff;
+      --cyan: #66f2e5;
+      --purple: #a18aff;
+      --pink: #ff6ca8;
+      --cell: 27px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      overflow-x: hidden;
+      background:
+        radial-gradient(ellipse at 50% 40%, rgba(80, 66, 153, .17), transparent 50%),
+        radial-gradient(ellipse at 90% 10%, rgba(41, 143, 143, .09), transparent 32%),
+        var(--bg);
+      color: var(--text);
+      font-family: "Space Grotesk", sans-serif;
+    }
+
+    body::before {
+      position: fixed;
+      z-index: -1;
+      inset: 0;
+      background-image: linear-gradient(rgba(141, 151, 203, .025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(141, 151, 203, .025) 1px, transparent 1px);
+      background-size: 42px 42px;
+      content: "";
+      mask-image: linear-gradient(to bottom, black, transparent 80%);
+    }
+
+    button { font: inherit; }
+    .app { width: min(100% - 40px, 1000px); margin: 0 auto; padding: 28px 0 24px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border: 1px solid rgba(102, 242, 229, .35);
+      border-radius: 12px;
+      background: rgba(102, 242, 229, .08);
+      color: var(--cyan);
+      font-size: 20px;
+      box-shadow: 0 0 24px rgba(102, 242, 229, .1);
+    }
+    .brand-name { font-size: 15px; font-weight: 700; letter-spacing: .13em; }
+    .brand-name span { color: var(--cyan); }
+    .brand-tag { margin-top: 2px; color: var(--muted); font: 10px "DM Mono", monospace; letter-spacing: .12em; }
+    .header-right { display: flex; align-items: center; gap: 18px; color: var(--muted); font: 11px "DM Mono", monospace; }
+    .live { display: flex; align-items: center; gap: 8px; }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 24px; align-items: start; max-width: 680px; margin: auto; }
+    .game-column { min-width: 0; }
+    .stats { display: grid; grid-template-columns: 1.35fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .stat-card, .side-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, .12);
+      backdrop-filter: blur(12px);
+    }
+    .stat-card { min-width: 0; padding: 13px 15px; }
+    .stat-label { color: var(--muted); font: 9px "DM Mono", monospace; letter-spacing: .13em; }
+    .stat-value { overflow: hidden; margin-top: 4px; font-size: 22px; font-weight: 600; letter-spacing: -.04em; text-overflow: ellipsis; }
+    .stat-card.score .stat-value { color: var(--cyan); font-size: 27px; }
+    .board-frame {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      padding: 13px;
+      overflow: hidden;
+      border: 1px solid rgba(161, 138, 255, .22);
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(27, 29, 49, .96), rgba(15, 17, 29, .98));
+      box-shadow: 0 0 0 1px rgba(102, 242, 229, .025), 0 18px 60px rgba(0, 0, 0, .3), 0 0 44px rgba(117, 93, 231, .07);
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(10, var(--cell));
+      grid-template-rows: repeat(20, var(--cell));
+      gap: 2px;
+      width: max-content;
+      border-radius: 6px;
+      background: rgba(5, 7, 14, .7);
+    }
+    .cell {
+      width: var(--cell);
+      height: var(--cell);
+      border: 1px solid rgba(146, 156, 207, .055);
+      border-radius: 4px;
+      background: rgba(117, 128, 180, .045);
+    }
+    .cell.filled { border-color: color-mix(in srgb, var(--piece-color) 60%, transparent); background: var(--piece-color); box-shadow: inset 0 2px 0 rgba(255,255,255,.28), inset 0 -3px 0 rgba(0,0,0,.2), 0 0 11px color-mix(in srgb, var(--piece-color) 34%, transparent); }
+    .cell.ghost { border: 1px solid color-mix(in srgb, var(--piece-color) 55%, transparent); background: color-mix(in srgb, var(--piece-color) 12%, transparent); box-shadow: inset 0 0 8px color-mix(in srgb, var(--piece-color) 12%, transparent); }
+    .overlay {
+      position: absolute;
+      inset: 13px;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      background: rgba(9, 10, 20, .79);
+      text-align: center;
+      backdrop-filter: blur(5px);
+    }
+    .overlay[hidden] { display: none; }
+    .overlay-content { max-width: 260px; padding: 20px; }
+    .overlay-kicker { color: var(--cyan); font: 10px "DM Mono", monospace; letter-spacing: .19em; }
+    .overlay h1 { margin: 10px 0 8px; font-size: clamp(24px, 5vw, 36px); letter-spacing: -.05em; }
+    .overlay p { margin: 0 0 20px; color: #a1a6c0; font-size: 13px; line-height: 1.6; }
+    .primary-btn {
+      min-width: 148px;
+      padding: 12px 18px;
+      border: 0;
+      border-radius: 10px;
+      background: linear-gradient(110deg, #67e9df, #82bfff);
+      color: #101623;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: 0 5px 24px rgba(102, 242, 229, .2);
+      transition: transform .18s, filter .18s;
+    }
+    .primary-btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+    .below-board { display: flex; justify-content: space-between; padding: 12px 3px 0; color: var(--muted); font: 9px "DM Mono", monospace; letter-spacing: .08em; }
+
+    .sidebar { display: grid; gap: 12px; }
+    .side-card { padding: 16px; }
+    .section-title { display: flex; align-items: center; justify-content: space-between; color: #bdc1d9; font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+    .section-title small { color: var(--muted); font: 9px "DM Mono", monospace; }
+    .next-preview { display: grid; width: 100px; height: 82px; margin: 14px auto 0; grid-template-columns: repeat(4, 20px); grid-template-rows: repeat(4, 20px); gap: 2px; place-content: center; }
+    .preview-cell { width: 20px; height: 20px; border-radius: 4px; }
+    .preview-cell.active { border: 1px solid color-mix(in srgb, var(--piece-color) 60%, transparent); background: var(--piece-color); box-shadow: inset 0 2px 0 rgba(255,255,255,.27), 0 0 9px color-mix(in srgb, var(--piece-color) 30%, transparent); }
+    .preview-cell.empty { background: transparent; }
+    .side-divider { height: 1px; margin: 14px 0; background: var(--line); }
+    .best-row { display: flex; align-items: end; justify-content: space-between; margin-top: 8px; }
+    .best-value { color: var(--purple); font-size: 22px; font-weight: 600; }
+    .best-caption { color: var(--muted); font: 9px "DM Mono", monospace; }
+    .level-track { height: 5px; margin-top: 12px; overflow: hidden; border-radius: 5px; background: rgba(161, 138, 255, .13); }
+    .level-progress { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--purple), var(--pink)); transition: width .3s; }
+    .controls { display: grid; gap: 10px; margin-top: 14px; }
+    .control-row { display: flex; align-items: center; justify-content: space-between; color: #a6abc4; font-size: 10px; }
+    kbd { min-width: 24px; padding: 4px 6px; border: 1px solid rgba(151, 164, 220, .2); border-radius: 5px; background: rgba(255,255,255,.035); color: #dce0f7; font: 9px "DM Mono", monospace; text-align: center; }
+    .key-group { display: flex; gap: 4px; }
+    .side-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .secondary-btn { padding: 10px 7px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.025); color: #c4c8df; cursor: pointer; font-size: 10px; transition: background .15s, border-color .15s; }
+    .secondary-btn:hover:not(:disabled) { border-color: rgba(102, 242, 229, .4); background: rgba(102, 242, 229, .06); }
+    .secondary-btn:disabled { opacity: .4; cursor: default; }
+    .mobile-controls { display: none; }
+    .footer { margin-top: 26px; color: #555b76; font: 9px "DM Mono", monospace; letter-spacing: .06em; text-align: center; }
+    button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+    @media (max-width: 650px) {
+      :root { --cell: min(7.5vw, 27px); }
+      .app { width: min(100% - 24px, 420px); padding-top: 18px; }
+      .topbar { margin-bottom: 20px; }
+      .header-right { gap: 8px; font-size: 9px; }
+      .header-right > span:first-child { display: none; }
+      .layout { grid-template-columns: minmax(0, 1fr) 112px; gap: 9px; }
+      .stats { grid-template-columns: 1.3fr 1fr; gap: 7px; }
+      .stat-card { padding: 10px; }
+      .stat-card.score { grid-column: span 2; }
+      .stat-card.score .stat-value { font-size: 23px; }
+      .stat-value { font-size: 19px; }
+      .stat-label { font-size: 8px; }
+      .board-frame { padding: 8px; border-radius: 12px; }
+      .board { gap: 1px; grid-template-rows: repeat(20, var(--cell)); }
+      .cell { border-radius: 3px; }
+      .overlay { inset: 8px; }
+      .sidebar { gap: 8px; }
+      .side-card { padding: 11px 9px; border-radius: 11px; }
+      .section-title { font-size: 9px; }
+      .section-title small { font-size: 8px; }
+      .next-preview { width: 82px; margin-top: 9px; }
+      .best-value { font-size: 18px; }
+      .best-caption { font-size: 8px; }
+      .desktop-controls { display: none; }
+      .mobile-controls { display: grid; }
+      .mobile-controls .secondary-btn { padding: 8px 2px; font-size: 9px; }
+      .mobile-controls .side-actions { grid-template-columns: 1fr; }
+      .below-board { font-size: 8px; }
+      .footer { margin-top: 18px; }
+    }
+
+    @media (max-width: 370px) {
+      :root { --cell: 6.8vw; }
+      .layout { grid-template-columns: minmax(0, 1fr) 100px; }
+      .brand-name { font-size: 13px; }
+      .brand-mark { width: 33px; height: 33px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">▦</div>
+        <div>
+          <div class="brand-name">NEON <span>STACK</span></div>
+          <div class="brand-tag">ARCADE / 001</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <span>CLASSIC MODE</span>
+        <span class="live"><i class="live-dot"></i> <span id="statusText">SẴN SÀNG</span></span>
+      </div>
+    </header>
+
+    <section class="layout" aria-label="Trò chơi xếp hình">
+      <div class="game-column">
+        <div class="stats">
+          <div class="stat-card score">
+            <div class="stat-label">ĐIỂM SỐ</div>
+            <div class="stat-value" id="score">000000</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">CẤP ĐỘ</div>
+            <div class="stat-value" id="level">01</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">HÀNG</div>
+            <div class="stat-value" id="lines">00</div>
+          </div>
+        </div>
+
+        <div class="board-frame">
+          <div class="board" id="board" role="img" aria-label="Bàn chơi 10 cột, 20 hàng"></div>
+          <div class="overlay" id="overlay">
+            <div class="overlay-content">
+              <div class="overlay-kicker" id="overlayKicker">SẴN SÀNG CHƯA?</div>
+              <h1 id="overlayTitle">Xếp hình<br>thật chất.</h1>
+              <p id="overlayMessage">Xếp các khối gạch thành hàng để ghi điểm. Bạn trụ được bao lâu?</p>
+              <button class="primary-btn" id="startButton">BẮT ĐẦU CHƠI</button>
+            </div>
+          </div>
+        </div>
+        <div class="below-board"><span>10 × 20 GRID</span><span>◈ CLEAR LINES. BE THE BEST.</span></div>
+
+        <div class="side-card mobile-controls" style="margin-top:12px">
+          <div class="side-actions">
+            <button class="secondary-btn" data-action="left" aria-label="Di chuyển sang trái">← Trái</button>
+            <button class="secondary-btn" data-action="rotate" aria-label="Xoay khối">↻ Xoay</button>
+            <button class="secondary-btn" data-action="down" aria-label="Di chuyển xuống">↓ Xuống</button>
+            <button class="secondary-btn" data-action="right" aria-label="Di chuyển sang phải">Phải →</button>
+            <button class="secondary-btn" data-action="drop" aria-label="Thả khối nhanh">⇊ Thả nhanh</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sidebar">
+        <section class="side-card">
+          <div class="section-title">TIẾP THEO <small>UP NEXT</small></div>
+          <div class="next-preview" id="nextPreview" aria-label="Khối tiếp theo"></div>
+          <div class="side-divider"></div>
+          <div class="section-title">KỶ LỤC <small>BEST</small></div>
+          <div class="best-row">
+            <span class="best-value" id="bestScore">000000</span>
+            <span class="best-caption">ALL TIME</span>
+          </div>
+        </section>
+
+        <section class="side-card">
+          <div class="section-title">TIẾN ĐỘ <small id="levelLabel">LV. 01</small></div>
+          <div class="level-track"><div class="level-progress" id="levelProgress"></div></div>
+          <div class="side-divider"></div>
+          <div class="section-title">ĐIỀU KHIỂN</div>
+          <div class="controls desktop-controls">
+            <div class="control-row"><span>Di chuyển</span><span class="key-group"><kbd>←</kbd><kbd>→</kbd></span></div>
+            <div class="control-row"><span>Rơi nhanh</span><kbd>↓</kbd></div>
+            <div class="control-row"><span>Xoay khối</span><kbd>↑</kbd></div>
+            <div class="control-row"><span>Thả tức thì</span><kbd>SPACE</kbd></div>
+            <div class="control-row"><span>Tạm dừng</span><kbd>P</kbd></div>
+          </div>
+          <div class="controls mobile-controls">
+            <div class="control-row"><span>Xoay</span><kbd>↻</kbd></div>
+            <div class="control-row"><span>Tạm dừng</span><kbd>Ⅱ</kbd></div>
+          </div>
+        </section>
+
+        <section class="side-card desktop-controls">
+          <div class="side-actions">
+            <button class="secondary-btn" id="pauseButton" disabled>Tạm dừng</button>
+            <button class="secondary-btn" id="restartButton">Chơi lại ↻</button>
+          </div>
+        </section>
+      </aside>
+    </section>
+    <footer class="footer">THIẾT KẾ ĐỂ CHƠI • NHẤN <kbd>P</kbd> ĐỂ TẠM DỪNG</footer>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+      const WIDTH = 10;
+      const HEIGHT = 20;
+      const SHAPES = {
+        I: { color: "#55e6e1", matrix: [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]] },
+        O: { color: "#ffd166", matrix: [[1, 1], [1, 1]] },
+        T: { color: "#ad83ff", matrix: [[0, 1, 0], [1, 1, 1], [0, 0, 0]] },
+        S: { color: "#80ed99", matrix: [[0, 1, 1], [1, 1, 0], [0, 0, 0]] },
+        Z: { color: "#ff6b8a", matrix: [[1, 1, 0], [0, 1, 1], [0, 0, 0]] },
+        J: { color: "#73a9ff", matrix: [[1, 0, 0], [1, 1, 1], [0, 0, 0]] },
+        L: { color: "#ff9f68", matrix: [[0, 0, 1], [1, 1, 1], [0, 0, 0]] }
+      };
+      const boardElement = document.getElementById("board");
+      const cells = [];
+      for (let i = 0; i < WIDTH * HEIGHT; i++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        boardElement.appendChild(cell);
+        cells.push(cell);
+      }
+
+      const preview = document.getElementById("nextPreview");
+      const previewCells = [];
+      for (let i = 0; i < 16; i++) {
+        const cell = document.createElement("div");
+        cell.className = "preview-cell empty";
+        preview.appendChild(cell);
+        previewCells.push(cell);
+      }
+
+      const overlay = document.getElementById("overlay");
+      const startButton = document.getElementById("startButton");
+      const pauseButton = document.getElementById("pauseButton");
+      const scoreElement = document.getElementById("score");
+      const bestElement = document.getElementById("bestScore");
+      const levelElement = document.getElementById("level");
+      const linesElement = document.getElementById("lines");
+      const levelProgress = document.getElementById("levelProgress");
+      const levelLabel = document.getElementById("levelLabel");
+      const statusText = document.getElementById("statusText");
+
+      let arena;
+      let player;
+      let nextType = randomType();
+      let score = 0;
+      let lines = 0;
+      let level = 1;
+      let best = readBest();
+      let state = "ready";
+      let dropCounter = 0;
+      let lastTime = 0;
+      let animationFrame = 0;
+
+      function readBest() {
+        try {
+          return Number(localStorage.getItem("neon-stack-best")) || 0;
+        } catch {
+          return 0;
+        }
+      }
+
+      function saveBest() {
+        try {
+          localStorage.setItem("neon-stack-best", String(best));
+        } catch {
+          // The current game remains playable when browser storage is unavailable.
+        }
+      }
+
+      function randomType() {
+        const types = Object.keys(SHAPES);
+        return types[Math.floor(Math.random() * types.length)];
+      }
+
+      function formatScore(value) {
+        return String(value).padStart(6, "0");
+      }
+
+      function updateStats() {
+        scoreElement.textContent = formatScore(score);
+        bestElement.textContent = formatScore(best);
+        levelElement.textContent = String(level).padStart(2, "0");
+        linesElement.textContent = String(lines).padStart(2, "0");
+        levelLabel.textContent = `LV. ${String(level).padStart(2, "0")}`;
+        levelProgress.style.width = `${(lines % 10) * 10}%`;
+      }
+
+      function updatePreview() {
+        const piece = SHAPES[nextType];
+        const matrix = piece.matrix;
+        const offsetX = Math.floor((4 - matrix[0].length) / 2);
+        const offsetY = Math.floor((4 - matrix.length) / 2);
+        previewCells.forEach((cell, index) => {
+          const x = index % 4;
+          const y = Math.floor(index / 4);
+          const filled = matrix[y - offsetY] && matrix[y - offsetY][x - offsetX];
+          cell.className = filled ? "preview-cell active" : "preview-cell empty";
+          if (filled) cell.style.setProperty("--piece-color", piece.color);
+          else cell.style.removeProperty("--piece-color");
+        });
+      }
+
+      function collide(board, active) {
+        const matrix = active.matrix;
+        for (let y = 0; y < matrix.length; y++) {
+          for (let x = 0; x < matrix[y].length; x++) {
+            if (!matrix[y][x]) continue;
+            const boardX = x + active.pos.x;
+            const boardY = y + active.pos.y;
+            if (boardX < 0 || boardX >= WIDTH || boardY >= HEIGHT) return true;
+            if (boardY >= 0 && board[boardY][boardX]) return true;
+          }
+        }
+        return false;
+      }
+
+      function merge(board, active) {
+        active.matrix.forEach((row, y) => row.forEach((value, x) => {
+          const boardY = y + active.pos.y;
+          if (value && boardY >= 0) board[boardY][x + active.pos.x] = active.color;
+        }));
+      }
+
+      function rotate(matrix, direction) {
+        for (let y = 0; y < matrix.length; y++) {
+          for (let x = 0; x < y; x++) {
+            [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+          }
+        }
+        if (direction > 0) matrix.forEach(row => row.reverse());
+        else matrix.reverse();
+      }
+
+      function playerRotate() {
+        const originalX = player.pos.x;
+        let offset = 1;
+        rotate(player.matrix, 1);
+        while (collide(arena, player)) {
+          player.pos.x += offset;
+          offset = -(offset + (offset > 0 ? 1 : -1));
+          if (Math.abs(offset) > player.matrix[0].length + 1) {
+            rotate(player.matrix, -1);
+            player.pos.x = originalX;
+            return;
+          }
+        }
+        render();
+      }
+
+      function clearLines() {
+        let cleared = 0;
+        outer: for (let y = arena.length - 1; y >= 0; y--) {
+          for (let x = 0; x < WIDTH; x++) {
+            if (!arena[y][x]) continue outer;
+          }
+          arena.splice(y, 1);
+          arena.unshift(Array(WIDTH).fill(0));
+          y++;
+          cleared++;
+        }
+        if (cleared) {
+          const points = [0, 100, 300, 500, 800];
+          score += (points[cleared] || cleared * 200) * level;
+          lines += cleared;
+          level = Math.floor(lines / 10) + 1;
+          if (score > best) {
+            best = score;
+            saveBest();
+          }
+          updateStats();
+        }
+      }
+
+      function spawnPiece() {
+        player.type = nextType;
+        player.matrix = SHAPES[player.type].matrix.map(row => row.slice());
+        player.color = SHAPES[player.type].color;
+        player.pos.y = 0;
+        player.pos.x = Math.floor((WIDTH - player.matrix[0].length) / 2);
+        nextType = randomType();
+        updatePreview();
+        if (collide(arena, player)) finishGame();
+      }
+
+      function lockPiece() {
+        merge(arena, player);
+        clearLines();
+        spawnPiece();
+      }
+
+      function movePlayer(direction) {
+        if (state !== "playing") return;
+        player.pos.x += direction;
+        if (collide(arena, player)) player.pos.x -= direction;
+        render();
+      }
+
+      function dropPlayer(manual) {
+        if (state !== "playing") return;
+        player.pos.y++;
+        if (collide(arena, player)) {
+          player.pos.y--;
+          lockPiece();
+        } else if (manual) {
+          score++;
+          if (score > best) {
+            best = score;
+            saveBest();
+          }
+          updateStats();
+        }
+        dropCounter = 0;
+        render();
+      }
+
+      function hardDrop() {
+        if (state !== "playing") return;
+        let distance = 0;
+        while (!collide(arena, player)) {
+          player.pos.y++;
+          distance++;
+        }
+        player.pos.y--;
+        distance--;
+        score += Math.max(0, distance) * 2;
+        if (score > best) {
+          best = score;
+          saveBest();
+        }
+        lockPiece();
+        updateStats();
+        render();
+      }
+
+      function drawPiece(matrix, pos, color, className) {
+        matrix.forEach((row, y) => row.forEach((value, x) => {
+          const boardY = y + pos.y;
+          const boardX = x + pos.x;
+          if (value && boardY >= 0 && boardY < HEIGHT && boardX >= 0 && boardX < WIDTH) {
+            const cell = cells[boardY * WIDTH + boardX];
+            cell.classList.add(className);
+            cell.style.setProperty("--piece-color", color);
+          }
+        }));
+      }
+
+      function render() {
+        cells.forEach((cell, i) => {
+          const color = arena[i / WIDTH | 0][i % WIDTH];
+          cell.className = color ? "cell filled" : "cell";
+          if (color) cell.style.setProperty("--piece-color", color);
+          else cell.style.removeProperty("--piece-color");
+        });
+        if (!player || state === "ready" || state === "over") return;
+        let ghostY = player.pos.y;
+        while (!collide(arena, { ...player, pos: { x: player.pos.x, y: ghostY + 1 } })) ghostY++;
+        drawPiece(player.matrix, { x: player.pos.x, y: ghostY }, player.color, "ghost");
+        drawPiece(player.matrix, player.pos, player.color, "filled");
+      }
+
+      function setOverlay(kicker, title, message, buttonText, visible) {
+        document.getElementById("overlayKicker").textContent = kicker;
+        document.getElementById("overlayTitle").innerHTML = title;
+        document.getElementById("overlayMessage").textContent = message;
+        startButton.textContent = buttonText;
+        overlay.hidden = !visible;
+      }
+
+      function setState(nextState) {
+        state = nextState;
+        pauseButton.disabled = nextState !== "playing" && nextState !== "paused";
+        pauseButton.textContent = nextState === "paused" ? "Tiếp tục" : "Tạm dừng";
+        statusText.textContent = nextState === "playing" ? "ĐANG CHƠI" : nextState === "paused" ? "TẠM DỪNG" : nextState === "over" ? "KẾT THÚC" : "SẴN SÀNG";
+      }
+
+      function beginGame() {
+        cancelAnimationFrame(animationFrame);
+        arena = Array.from({ length: HEIGHT }, () => Array(WIDTH).fill(0));
+        player = { pos: { x: 0, y: 0 }, matrix: [], color: "", type: "" };
+        score = 0;
+        lines = 0;
+        level = 1;
+        nextType = randomType();
+        updateStats();
+        updatePreview();
+        setState("playing");
+        overlay.hidden = true;
+        spawnPiece();
+        render();
+        dropCounter = 0;
+        lastTime = 0;
+        animationFrame = requestAnimationFrame(update);
+      }
+
+      function finishGame() {
+        setState("over");
+        setOverlay("RUN OVER", "GAME<br>OVER", `Điểm của bạn: ${formatScore(score)}. Thử lại và lập kỷ lục mới!`, "CHƠI LẠI", true);
+        render();
+      }
+
+      function togglePause() {
+        if (state === "playing") {
+          setState("paused");
+          setOverlay("PAUSED", "TẠM<br>DỪNG", "Hít thở một chút. Những khối gạch vẫn đang chờ bạn.", "TIẾP TỤC", true);
+          cancelAnimationFrame(animationFrame);
+        } else if (state === "paused") {
+          setState("playing");
+          overlay.hidden = true;
+          lastTime = 0;
+          animationFrame = requestAnimationFrame(update);
+        }
+      }
+
+      function update(time = 0) {
+        if (state !== "playing") return;
+        const delta = lastTime ? time - lastTime : 0;
+        lastTime = time;
+        dropCounter += delta;
+        const speed = Math.max(90, 800 - (level - 1) * 65);
+        if (dropCounter > speed) dropPlayer(false);
+        if (state === "playing") animationFrame = requestAnimationFrame(update);
+      }
+
+      function handleAction(action) {
+        if (action === "left") movePlayer(-1);
+        if (action === "right") movePlayer(1);
+        if (action === "down") dropPlayer(true);
+        if (action === "rotate" && state === "playing") playerRotate();
+        if (action === "drop") hardDrop();
+      }
+
+      document.addEventListener("keydown", event => {
+        const keyActions = {
+          ArrowLeft: "left",
+          ArrowRight: "right",
+          ArrowDown: "down",
+          ArrowUp: "rotate",
+          " ": "drop"
+        };
+        if (keyActions[event.key]) {
+          event.preventDefault();
+          handleAction(keyActions[event.key]);
+        } else if (event.key.toLowerCase() === "p" || event.key === "Escape") {
+          event.preventDefault();
+          togglePause();
+        } else if (event.key === "Enter" && (state === "ready" || state === "over")) {
+          beginGame();
+        }
+      });
+
+      document.querySelectorAll("[data-action]").forEach(button => {
+        button.addEventListener("click", () => handleAction(button.dataset.action));
+      });
+      startButton.addEventListener("click", () => {
+        if (state === "paused") togglePause();
+        else beginGame();
+      });
+      pauseButton.addEventListener("click", togglePause);
+      document.getElementById("restartButton").addEventListener("click", beginGame);
+      updateStats();
+      updatePreview();
+    })();
+  </script>
+</body>
+</html>
